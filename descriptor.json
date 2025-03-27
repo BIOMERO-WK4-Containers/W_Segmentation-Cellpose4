@@ -75,17 +75,6 @@
       "type": "Number"
     },
     {
-      "id": "nuc_channel",
-      "value-key": "@ID",
-      "command-line-flag": "--@id",
-      "name": "Nuclei channel",
-	"description": "Use default 0 for grayscale and RGB that should be converted to grayscale based on luminance. Use 1, 2 or 3 to select a specific RGB channel",
-      "default-value": 0,
-      "set-by-server": false,
-      "optional": true,
-      "type": "Number"
-    },
-    {
       "id": "use_gpu",
       "value-key": "@ID",
       "command-line-flag": "--@id",
@@ -106,7 +95,106 @@
       "set-by-server": false,
       "optional": true,
       "type": "String"
-    }
+    },
+    {
+      "id": "nuc_channel",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Nuclei channel",
+      "description": "Choose channel to segment (start at 0), -1 to segment all channels",
+      "default-value": 0,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "time_series",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Process time series",
+      "description": "Process specific time point (start at 0), -1 to process all time points",
+      "default-value": -1,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "z_slices",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Process z slices",
+      "description": "Process specific z-slice (start at 0), -1 to process all z-slices",
+      "default-value": -1,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "scale_factor",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Scale factor",
+      "description": "Scale the input image by this factor for processing. Values <1 for large nuclei, >1 for small nuclei, 1.0 for no scaling.",
+      "default-value": 1.0,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "tile_size_x",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Tile size X",
+      "description": "Size of tiles in X dimension for processing large images. Images larger than this will use block processing.",
+      "default-value": 1024,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "tile_size_y",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Tile size Y",
+      "description": "Size of tiles in Y dimension for processing large images. Images larger than this will use block processing.",
+      "default-value": 1024,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "block_overlap",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Block overlap",
+      "description": "Overlap between blocks for large image processing (must be smaller than tile size)",
+      "default-value": 128,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  },
+  {
+      "id": "auto_tiling",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Auto diam",
+      "description": "Automatically determine whether to use tiling based on image size",
+      "default-value": true,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Boolean"
+  },
+  {
+      "id": "batch_size",
+      "value-key": "@ID",
+      "command-line-flag": "--@id",
+      "name": "Batch Size",
+      "description": "Number of parallel cell pose prcoesses",
+      "default-value": 8,
+      "set-by-server": false,
+      "optional": true,
+      "type": "Number"
+  }
   ],
 
   "schema-version": "cytomine-0.1"
