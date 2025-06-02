@@ -1,80 +1,104 @@
-FROM condaforge/miniforge3:24.11.3-2 
+# Choose a base image with CUDA support.
+# Select a CUDA version compatible with the PyTorch needed for cellpose and your host drivers.
+# Using an Ubuntu base often works well with Conda. Using a -devel image includes compilers if needed.
+# Example: CUDA 11.8 on Ubuntu 20.04
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu20.04
+# Example: CUDA 12.1 on Ubuntu 22.04
+# FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
 
-# System dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    libgeos-dev \
-    vim \
-    gcc \
-    g++ \
-    zlib1g-dev \
-    libjpeg-dev \
-    libfreetype6-dev \
-    libtiff-dev \
-    libwebp-dev \
-    libgl1-mesa-dev \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+# Set environment variables to prevent interactive prompts during build
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=C.UTF-8
+ENV LC_ALL=C.UTF-8
+ENV PATH=/opt/conda/bin:$PATH
 
-# Create working directory
+# >>> ADDED: Define default directories for models <<<
+ENV CELLPOSE_LOCAL_MODELS_PATH=/opt/cellpose/models/
+
+# Install base dependencies and cleanup
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        wget \
+        git \
+        bzip2 \
+        ca-certificates \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender1 \
+        libgeos-dev \
+        libgl1-mesa-dev \
+        build-essential \
+        libxcb-cursor0 \
+        libxcb-xinerama0 \
+        libxcb-icccm4 \
+        libxcb-image0 \
+        libxcb-keysyms1 \
+        libxcb-randr0 \
+        libxcb-render-util0 \
+        libxcb-xkb1 \
+        libxkbcommon-x11-0 \
+        && apt-get clean \
+        && rm -rf /var/lib/apt/lists/*
+# >>> ADDED: Create the default cache directories <<<
+# Ensure the default cache directories exist within the container
+RUN mkdir -p ${CELLPOSE_LOCAL_MODELS_PATH} && chmod 777 ${CELLPOSE_LOCAL_MODELS_PATH}
+
+# ------------------------------------------------------------------------------
+# Install Miniconda
+# ------------------------------------------------------------------------------
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p /opt/conda && \
+    rm ~/miniconda.sh && \
+    /opt/conda/bin/conda clean -a -y && \
+    ln -s /opt/conda/etc/profile.d/conda.sh /etc/profile.d/conda.sh && \
+    echo ". /opt/conda/etc/profile.d/conda.sh" >> ~/.bashrc && \
+    conda init bash # Initialize conda for the SHELL
+
+# Make conda available in RUN instructions using the initialized shell
+SHELL ["/bin/bash", "--login", "-c"]
+
+# Update conda
+RUN conda update -n base -c defaults conda --yes
+
+# ------------------------------------------------------------------------------
+# Create Cytomine environment (Python 3.7)
+# ------------------------------------------------------------------------------
+ENV CYTOMINE_ENV_NAME=cytomine_py37
+RUN conda create -n $CYTOMINE_ENV_NAME python=3.7 -y
+
+RUN conda run -n $CYTOMINE_ENV_NAME pip install --no-cache-dir \
+        git+https://github.com/cytomine-uliege/Cytomine-python-client.git@v2.7.3
+
+RUN conda run -n $CYTOMINE_ENV_NAME pip install --no-cache-dir \
+        git+https://github.com/Neubias-WG5/biaflows-utilities.git@v0.9.2
+
+
+# ------------------------------------------------------------------------------
+# Create a dedicated Cellpose environment with CUDA support
+# ------------------------------------------------------------------------------
+ENV CELLPOSE_ENV_NAME=cellpose_env
+
+# Create environment with Python 3.10 for better compatibility with PyTorch/CUDA
+RUN conda create -n $CELLPOSE_ENV_NAME -c conda-forge python=3.10 -y
+
+# Install PyTorch with CUDA 11.8 support
+RUN conda run -n $CELLPOSE_ENV_NAME conda install -c pytorch -c nvidia \
+    pytorch torchvision torchaudio pytorch-cuda==11.8 -y
+
+# Install Cellpose with GPU support
+RUN conda run -n $CELLPOSE_ENV_NAME pip install --no-cache-dir cellpose[distributed]
+
+# Clean up conda cache
+RUN conda clean -a -y
+
+# ------------------------------------------------------------------------------
+# Application Code & Entrypoint
+# ------------------------------------------------------------------------------
 WORKDIR /app
+# >>> Ensure you are copying the correct wrapper script <<<
+COPY run.py /app/run.py
+COPY descriptor.json /app/descriptor.json
 
-RUN mkdir -p /root/.cellpose/models && \
-    cd /root/.cellpose/models && \
-    wget http://www.cellpose.org/models/nuclei_0 && \
-    wget http://www.cellpose.org/models/nuclei_1 && \
-    wget http://www.cellpose.org/models/nuclei_2 && \
-    wget http://www.cellpose.org/models/nuclei_3 && \
-    wget http://www.cellpose.org/models/size_nuclei_0.npy && \
-    wget --no-check-certificate https://www.cellpose.org/models/cyto_0 && \
-    wget --no-check-certificate https://www.cellpose.org/models/cyto_1 && \
-    wget --no-check-certificate https://www.cellpose.org/models/cyto_2 && \
-    wget --no-check-certificate https://www.cellpose.org/models/cyto_3 && \
-    wget --no-check-certificate https://www.cellpose.org/models/size_cyto_0.npy && \
-    wget --no-check-certificate https://www.cellpose.org/models/cytotorch_0 && \
-    wget --no-check-certificate https://www.cellpose.org/models/cytotorch_1 && \
-    wget --no-check-certificate https://www.cellpose.org/models/cytotorch_2 && \
-    wget --no-check-certificate https://www.cellpose.org/models/cytotorch_3 && \
-    wget --no-check-certificate https://www.cellpose.org/models/size_cytotorch_0.npy && \
-    wget --no-check-certificate https://www.cellpose.org/models/nucleitorch_0 && \
-    wget --no-check-certificate https://www.cellpose.org/models/nucleitorch_1 && \
-    wget --no-check-certificate https://www.cellpose.org/models/nucleitorch_2 && \
-    wget --no-check-certificate https://www.cellpose.org/models/nucleitorch_3 && \
-    wget --no-check-certificate https://www.cellpose.org/models/size_nucleitorch_0.npy
-
-# Install BIAFLOWS requirements in base environment
-RUN conda install -y python=3.7
-
-# ------------------------------------------------------------------------------
-# Install Cytomine python client
-RUN git clone https://github.com/cytomine-uliege/Cytomine-python-client.git && \
-    cd Cytomine-python-client && git checkout tags/v2.7.3 && pip install . && \
-    cd .. && rm -rf Cytomine-python-client
-
-# ------------------------------------------------------------------------------
-# Install BIAFLOWS utilities (annotation exporter, compute metrics, helpers,...)
-RUN apt-get update && apt-get install libgeos-dev -y && apt-get clean
-RUN git clone https://github.com/Neubias-WG5/biaflows-utilities.git && \
-    cd biaflows-utilities/ && git checkout tags/v0.9.2 && pip install . && \
-    cd ..
-
-# install utilities binaries
-RUN chmod +x /app/biaflows-utilities/bin/*
-RUN cp /app/biaflows-utilities/bin/* /usr/bin/ && \
-    rm -rf /app/biaflows-utilities
-
-
-
-# Create separate conda environment for micro-sam
-RUN conda create -n cellpose -y python=3.10
-RUN conda run -n cellpose pip install cellpose[distributed]
-RUN conda run -n cellpose pip install zarr
-
-RUN pip install numpy==1.19.4
-RUN pip install numba==0.50.1
-
-# Add wrapper and descriptor
-ADD wrapper.py /app/wrapper.py
-ADD descriptor.json /app/descriptor.json
-
-ENTRYPOINT ["python3.7","/app/wrapper.py"]
+# >>> Ensure Entrypoint points to the correct script <<<
+ENTRYPOINT ["/opt/conda/envs/cytomine_py37/bin/python", "/app/run.py"]

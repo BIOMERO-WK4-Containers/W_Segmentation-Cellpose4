@@ -58,7 +58,7 @@
       "command-line-flag": "--@id",
       "name": "Nuclei diameter (if 0 cellpose will estimate for each image)",
       "description": "Nuclei diameter (if 0 cellpose will estimate for each image)",
-      "default-value": 0,
+      "default-value": 30,
       "set-by-server": false,
       "optional": true,
       "type": "Number"
