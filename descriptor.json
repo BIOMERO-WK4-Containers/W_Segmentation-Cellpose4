@@ -2,7 +2,7 @@
   "name": "NucleiSegmentation-Cellpose",
   "description": "2D nuclei segmentation using Cellpose",
   "container-image": {
-    "image": "torecluik/w_nucleisegmentation-cellpose",
+    "image": "maartenpaul/w_nucleisegmentation-cellpose",
     "type": "singularity"
   },
   "command-line": "python wrapper.py CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE DIAMETER PROB_THRESHOLD NUC_CHANNEL USE_GPU CP_MODEL",
