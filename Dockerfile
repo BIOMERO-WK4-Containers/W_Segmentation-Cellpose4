@@ -13,7 +13,7 @@ ENV LC_ALL=C.UTF-8
 ENV PATH=/opt/conda/bin:$PATH
 
 # >>> ADDED: Define default directories for models <<<
-ENV CELLPOSE_LOCAL_MODELS_PATH=/opt/cellpose/models/
+ENV CELLPOSE_LOCAL_MODELS_PATH=/tmp/cellpose/models/
 
 # Install base dependencies and cleanup
 RUN apt-get update && \
