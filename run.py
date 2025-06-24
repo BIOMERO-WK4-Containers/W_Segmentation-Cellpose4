@@ -255,20 +255,26 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
                     # Create a unique filename for this slice
                     slice_filename = f"t{t:03d}_z{z:03d}_c{channel:03d}.tif"
                     slice_path = os.path.join(img_tmp_dir, slice_filename)
-                    
-                    # Set minimum dimension handling - pad if needed
+                      # Set minimum dimension handling - pad if needed
                     minshape = min(img_slice.shape[:2])
                     maxshape = max(img_slice.shape[:2])
                     original_shape = img_slice.shape
                     
-                    # Ensure dimensions are at least 224x224 (Cellpose minimum)
+                    # Ensure dimensions are compatible with transformer models (divisible by 32) and at least 224x224
+                    def make_divisible_by_32(size):
+                        return int(np.ceil(size / 32.0)) * 32
+                    
                     if minshape != maxshape or minshape < 224:
                         # Get image dimensions
                         height, width = img_slice.shape[:2]  # Get first two dimensions
                         
-                        # Calculate padding needed for height and width
-                        pad_height = max(0, max(224, maxshape) - height)
-                        pad_width = max(0, max(224, maxshape) - width)
+                        # Make dimensions at least 224 and divisible by 32 for transformer compatibility
+                        target_height = make_divisible_by_32(max(224, height))
+                        target_width = make_divisible_by_32(max(224, width))
+                        
+                        # Calculate padding needed
+                        pad_height = target_height - height
+                        pad_width = target_width - width
                         
                         # Create appropriate padding configuration based on image dimensions
                         if len(img_slice.shape) == 2:  # Grayscale
@@ -312,12 +318,11 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
         # Run Cellpose on all prepared slices
         bj.job.update(status=Job.RUNNING, progress=60,
                     statusComment="Running Cellpose on prepared slices...")
-        
-        # Cellpose parameters with defensive handling
-        # Get model type with fallback
-        model_type = getattr(params, 'cp_model', 'cyto')
+          # Cellpose parameters with defensive handling
+        # Get model type with fallback - Updated to use cpsam as default
+        model_type = getattr(params, 'cp_model', 'cpsam')
         if not model_type:
-            model_type = 'cyto'  # Default to cyto model
+            model_type = 'cpsam'  # Default to cpsam model (Cellpose-SAM)
             
         # Get diameter with fallback
         diameter = getattr(params, 'diameter', 30)
@@ -384,15 +389,32 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
         
         # Add 3D processing if needed
         if do_3D:
-            cmd.append("--do_3D")
-            
-        # Add anisotropy parameter if not default
+            cmd.append("--do_3D")        # Add anisotropy parameter if not default
         if anisotropy != 1.0:
             cmd.extend(["--anisotropy", f"{anisotropy}"])
         
-        # Add augmentation if requested
-        if augment:
+        # Get tiling parameters - only use tiling for large images
+        auto_tiling = getattr(params, 'auto_tiling', False)  # Changed default to False
+        augment = getattr(params, 'augment', False)
+        
+        # Only enable tiling if explicitly requested OR if image is very large
+        image_size = dims['Y'] * dims['X']
+        large_image_threshold = 2048 * 2048  # 4 megapixels
+        
+        should_tile = auto_tiling or (image_size > large_image_threshold)
+        
+        # Add augmentation/tiling if needed
+        if should_tile or augment:
             cmd.append("--augment")
+            
+            # Only add bsize if we're actually tiling
+            if should_tile:
+                # Use larger default bsize - 224 is indeed very small
+                bsize = getattr(params, 'bsize', 512)  # Increased default from 224 to 512
+                cmd.extend(["--bsize", f"{bsize}"])
+                
+                status_msg = f"Large image detected ({dims['Y']}x{dims['X']}), using tiling with bsize={bsize}"
+                bj.job.update(status=Job.RUNNING, statusComment=status_msg)
             
         # Add normalization percentiles if specified
         if norm_percentile_min is not None and norm_percentile_max is not None:
@@ -405,16 +427,6 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
         # Add no_norm if requested
         if no_norm:
             cmd.append("--no_norm")
-        
-        # Get tiling parameters
-        tile_flag = getattr(params, 'tile', False) 
-        if tile_flag:
-            # Get tile overlap with fallback
-            tile_overlap = getattr(params, 'tile_overlap', 0.1)
-            
-            # Get block size with fallback
-            bsize = getattr(params, 'bsize', 224)
-            cmd.extend(["--tile", "--tile_overlap", f"{tile_overlap}", "--bsize", f"{bsize}"])
         
         # Run Cellpose
         bj.job.update(status=Job.RUNNING, progress=65,
@@ -459,7 +471,7 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
                              statusComment=f"Warning: Mask not found for {metadata['filename']}")
         
         # Create final output path
-        output_name = f"{os.path.splitext(img_name)[0]}_cellpose.tif"
+        output_name = f"{os.path.splitext(img_name)[0]}.tif"
         output_path = os.path.join(out_dir, output_name)
         
         # Add dimension mapping information to output metadata
