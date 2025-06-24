@@ -87,7 +87,7 @@ RUN conda run -n $CELLPOSE_ENV_NAME conda install -c pytorch -c nvidia \
     pytorch torchvision torchaudio pytorch-cuda==11.8 -y
 
 # Install Cellpose with GPU support
-RUN conda run -n $CELLPOSE_ENV_NAME pip install --no-cache-dir cellpose[distributed]
+RUN conda run -n $CELLPOSE_ENV_NAME pip install --no-cache-dir cellpose[distributed]=4.0.4
 
 # Clean up conda cache
 RUN conda clean -a -y
