@@ -1,6 +1,6 @@
-# W_NucleiSegmentation-Cellpose
+# W_Segmentation-Cellpose4
 
-2D/3D nuclei segmentation using Cellpose with pretrained models. This container processes multi-dimensional images (TZCYX) and handles channel selection, time points, and z-slices.
+2D/3D nuclei segmentation using Cellpose 4 with pretrained models. This container processes multi-dimensional images (TZCYX) and handles channel selection, time points, and z-slices.
 
 ## References
 - Cellpose-SAM: superhuman generalization for cellular segmentation  
