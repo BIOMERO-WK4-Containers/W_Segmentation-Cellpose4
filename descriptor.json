@@ -1,7 +1,7 @@
-{  "name": "NucleiSegmentation-Cellpose",
+{  "name": "Segmentation-Cellpose4",
   "description": "Cell segmentation using Cellpose-SAM",
   "container-image": {
-    "image": "maartenpaul/w_segmentation-cellpose",
+    "image": "maartenpaul/w_segmentation-cellpose4",
     "type": "singularity"
   },
   "command-line": "python run.py CYTOMINE_HOST CYTOMINE_PUBLIC_KEY CYTOMINE_PRIVATE_KEY CYTOMINE_ID_PROJECT CYTOMINE_ID_SOFTWARE DIAMETER PROB_THRESHOLD NUC_CHANNEL USE_GPU CP_MODEL",
