@@ -100,5 +100,12 @@ WORKDIR /app
 COPY run.py /app/run.py
 COPY descriptor.json /app/descriptor.json
 
-# >>> Ensure Entrypoint points to the correct script <<<
-ENTRYPOINT ["/opt/conda/envs/cytomine_py37/bin/python", "/app/run.py"]
+# This is the simplified ENTRYPOINT:
+# It sources conda.sh, activates your Cytomine environment, and then runs run.py
+# The "$@" ensures any arguments you pass to `docker run` are sent to run.py
+ENTRYPOINT ["bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate cytomine_py37 && exec python /app/run.py \"$@\"", "--"]
+
+# Set a default command if no arguments are provided to `docker run`.
+# If you run `docker run your_image`, it will implicitly pass "" as "$@" to the ENTRYPOINT.
+# If you provide args like `docker run your_image --local`, those args become "$@".
+CMD []
