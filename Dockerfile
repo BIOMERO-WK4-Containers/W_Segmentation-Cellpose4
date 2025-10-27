@@ -103,13 +103,13 @@ RUN conda clean -a -y
 # ------------------------------------------------------------------------------
 WORKDIR /app
 # >>> Ensure you are copying the correct wrapper script <<<
-COPY run.py /app/run.py
+COPY wrapper.py /app/wrapper.py
 COPY descriptor.json /app/descriptor.json
 
 # This is the simplified ENTRYPOINT:
-# It sources conda.sh, activates your conda environment, and then runs run.py
-# The "$@" ensures any arguments you pass to `docker run` are sent to run.py
-ENTRYPOINT ["bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate cytomine_py37 && exec python /app/run.py \"$@\"", "--"]
+# It sources conda.sh, activates your conda environment, and then runs wrapper.py
+# The "$@" ensures any arguments you pass to `docker run` are sent to wrapper.py
+ENTRYPOINT ["bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate cytomine_py37 && exec python /app/wrapper.py \"$@\"", "--"]
 
 # Set a default command if no arguments are provided to `docker run`.
 # If you run `docker run your_image`, it will implicitly pass "" as "$@" to the ENTRYPOINT.
