@@ -67,14 +67,16 @@ RUN conda config --add channels conda-forge && conda config --set channel_priori
 RUN conda update -n base -c defaults conda --yes
 
 # ------------------------------------------------------------------------------
-# Create conda environment (Python 3.7)
+# Create Cytomine environment (Python 3.7)
 # ------------------------------------------------------------------------------
-ENV ENV_NAME=cellpose_py37
-RUN conda create -n $ENV_NAME python=3.7 -y
+ENV CYTOMINE_ENV_NAME=cytomine_py37
+RUN conda create -n $CYTOMINE_ENV_NAME python=3.7 -y
 
-RUN conda run -n $ENV_NAME pip install --no-cache-dir \
+RUN conda run -n $CYTOMINE_ENV_NAME pip install --no-cache-dir \
+        git+https://github.com/cytomine-uliege/Cytomine-python-client.git@v2.7.3
+
+RUN conda run -n $CYTOMINE_ENV_NAME pip install --no-cache-dir \
         git+https://github.com/Neubias-WG5/biaflows-utilities.git@v0.9.2
-
 
 # ------------------------------------------------------------------------------
 # Create a dedicated Cellpose environment with CUDA support
@@ -87,6 +89,8 @@ RUN conda create -n $CELLPOSE_ENV_NAME -c conda-forge python=3.10 -y
 # Install PyTorch with CUDA 11.8 support
 RUN conda run -n $CELLPOSE_ENV_NAME conda install -c pytorch -c nvidia \
     pytorch torchvision torchaudio pytorch-cuda==11.8 -y
+
+RUN pip install scikit-image
 
 # Install Cellpose with GPU support
 RUN conda run -n $CELLPOSE_ENV_NAME pip install --no-cache-dir cellpose[distributed]==4.0.4

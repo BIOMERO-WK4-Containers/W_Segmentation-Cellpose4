@@ -24,7 +24,6 @@ from tifffile import imwrite, TiffFile
 import skimage
 import skimage.io
 import skimage.color
-from cytomine.models import Job
 from biaflows import CLASS_OBJSEG
 from biaflows.helpers import BiaflowsJob, prepare_data, upload_data, upload_metrics
 
@@ -133,12 +132,6 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
         # Load image data and get axes information
         volume = tif.asarray()
         original_axes = tif.series[0].axes
-        bj.job.update(status=Job.RUNNING, progress=30,
-                     statusComment=f"Processing image with original axes: {original_axes}")
-        
-        # Convert to 5D with TZCYX order for processing
-        bj.job.update(status=Job.RUNNING, progress=35,
-                     statusComment="Converting to 5D TZCYX format...")
         img_5d, axes_5d = convert_to_5d_from_tifffile(volume, original_axes, target="TZCYX")
         
         # Track dimension sizes for clarity
@@ -149,8 +142,6 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
             'Y': img_5d.shape[3],  # Height
             'X': img_5d.shape[4]   # Width
         }
-        bj.job.update(status=Job.RUNNING, progress=40,
-                     statusComment=f"Dimensions (TZCYX): {dims}")
         
         # Get channel, time, and z-slice parameters with defensive handling
         # Get the nuclear channel with fallback to 0
@@ -169,9 +160,6 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
             if hasattr(params, param_name):
                 z_slice = getattr(params, param_name)
                 break
-                
-        bj.job.update(status=Job.RUNNING, progress=45,
-                      statusComment=f"Using parameters: channel={nuc_channel}, time={time_point}, z={z_slice}")
         
         # Prepare channel list to process
         if isinstance(nuc_channel, (int, np.integer)):
@@ -244,9 +232,6 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
         slice_metadata = []
         
         for ch_idx, channel in enumerate(channels_to_process):
-            bj.job.update(status=Job.RUNNING,
-                         statusComment=f"Processing channel {channel} ({ch_idx+1}/{len(channels_to_process)})")
-            
             for t_idx, t in enumerate(time_points_to_process):
                 for z_idx, z in enumerate(z_slices_to_process):
                     # Extract YX slice from current TZC position
@@ -312,12 +297,8 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
                     # Update progress
                     current_slice += 1
                     progress = 40 + (20 * current_slice / total_slices)
-                    bj.job.update(status=Job.RUNNING, progress=int(progress),
-                                statusComment=f"Prepared slice {current_slice}/{total_slices}: t{t}, z{z}, c{channel}")
         
         # Run Cellpose on all prepared slices
-        bj.job.update(status=Job.RUNNING, progress=60,
-                    statusComment="Running Cellpose on prepared slices...")
           # Cellpose parameters with defensive handling
         # Get model type with fallback - Updated to use cpsam as default
         model_type = getattr(params, 'cp_model', 'cpsam')
@@ -414,7 +395,7 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
                 cmd.extend(["--bsize", f"{bsize}"])
                 
                 status_msg = f"Large image detected ({dims['Y']}x{dims['X']}), using tiling with bsize={bsize}"
-                bj.job.update(status=Job.RUNNING, statusComment=status_msg)
+                print(status_msg)
             
         # Add normalization percentiles if specified
         if norm_percentile_min is not None and norm_percentile_max is not None:
@@ -428,22 +409,16 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
         if no_norm:
             cmd.append("--no_norm")
         
-        # Run Cellpose
-        bj.job.update(status=Job.RUNNING, progress=65,
-                    statusComment=f"Running Cellpose with command: {' '.join(cmd)}")
-        
+        # Run Cellpose        
         try:
             process = subprocess.run(cmd, check=True, text=True, capture_output=True)
             if process.stdout:
                 print("Cellpose output:", process.stdout)
         except subprocess.CalledProcessError as e:
             error_msg = f"Cellpose failed with exit code {e.returncode}: {e.stderr}"
-            bj.job.update(status=Job.FAILED, progress=65, statusComment=error_msg)
             raise RuntimeError(error_msg)
         
         # Process results
-        bj.job.update(status=Job.RUNNING, progress=80,
-                    statusComment="Processing Cellpose results...")
         
         # Reconstruct 5D array from processed slices
         for metadata in slice_metadata:
@@ -467,8 +442,7 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
                 # Store in output array
                 output[t_idx, z_idx, c_idx, :mask.shape[0], :mask.shape[1]] = mask
             else:
-                bj.job.update(status=Job.RUNNING, 
-                             statusComment=f"Warning: Mask not found for {metadata['filename']}")
+                raise Warning(f"Warning: Mask not found for {metadata['filename']}")
         
         # Create final output path
         output_name = f"{os.path.splitext(img_name)[0]}.tif"
@@ -502,11 +476,9 @@ def process_image(img_path, out_dir, tmp_dir, bj, params):
           # Clean up temporary directory
         try:
             shutil.rmtree(img_tmp_dir)
-            bj.job.update(status=Job.RUNNING, 
-                         statusComment=f"Cleaned up temporary directory: {img_tmp_dir}")
+            print(f"Cleaned up temporary directory: {img_tmp_dir}")
         except Exception as err:
-            bj.job.update(status=Job.RUNNING, 
-                         statusComment=f"Warning: Could not remove temp directory: {str(err)}")
+            raise Warning(f"Warning: Could not remove temp directory: {str(err)}")
         
         return output_path, dimension_mapping
 
@@ -516,8 +488,6 @@ def main(argv):
     problem_cls = CLASS_OBJSEG
 
     with BiaflowsJob.from_cli(argv) as bj:
-        bj.job.update(status=Job.RUNNING, progress=0, statusComment="Initialization...")
-
         # 1. Prepare data for workflow
         in_imgs, gt_imgs, in_path, gt_path, out_path, tmp_path = prepare_data(problem_cls, bj, is_2d=False, **bj.flags)
         
@@ -550,7 +520,7 @@ def main(argv):
             
             except Exception as err:
                 error_msg = f"Error processing {img_name}: {str(err)}"
-                bj.job.update(status=Job.RUNNING, progress=80, statusComment=error_msg)
+                print(error_msg)
                 import traceback
                 traceback.print_exc()
                 # Continue with next image
@@ -569,14 +539,9 @@ def main(argv):
         bj.job.update(progress=98, statusComment="Cleaning up temporary files...")
         try:
             shutil.rmtree(tmp_path)  # cleanup tmp
-            bj.job.update(status=Job.RUNNING, 
-                         statusComment=f"Successfully cleaned up main temporary directory: {tmp_path}")
         except Exception as err:
-            bj.job.update(status=Job.RUNNING, 
-                         statusComment=f"Warning: Could not remove main temp directory: {str(err)}")
-        
-        # 6. Finish
-        bj.job.update(progress=100, status=Job.TERMINATED, status_comment="Finished.")
+            raise Warning(f"Warning: Could not remove main temp directory: {str(err)}")
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
