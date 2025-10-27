@@ -58,19 +58,21 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
 # Make conda available in RUN instructions using the initialized shell
 SHELL ["/bin/bash", "--login", "-c"]
 
+# Accept conda channels terms & conditions
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main
+RUN conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
+RUN conda config --add channels conda-forge && conda config --set channel_priority strict
+
 # Update conda
 RUN conda update -n base -c defaults conda --yes
 
 # ------------------------------------------------------------------------------
-# Create Cytomine environment (Python 3.7)
+# Create conda environment (Python 3.7)
 # ------------------------------------------------------------------------------
-ENV CYTOMINE_ENV_NAME=cytomine_py37
-RUN conda create -n $CYTOMINE_ENV_NAME python=3.7 -y
+ENV ENV_NAME=cellpose_py37
+RUN conda create -n $ENV_NAME python=3.7 -y
 
-RUN conda run -n $CYTOMINE_ENV_NAME pip install --no-cache-dir \
-        git+https://github.com/cytomine-uliege/Cytomine-python-client.git@v2.7.3
-
-RUN conda run -n $CYTOMINE_ENV_NAME pip install --no-cache-dir \
+RUN conda run -n $ENV_NAME pip install --no-cache-dir \
         git+https://github.com/Neubias-WG5/biaflows-utilities.git@v0.9.2
 
 
@@ -101,7 +103,7 @@ COPY run.py /app/run.py
 COPY descriptor.json /app/descriptor.json
 
 # This is the simplified ENTRYPOINT:
-# It sources conda.sh, activates your Cytomine environment, and then runs run.py
+# It sources conda.sh, activates your conda environment, and then runs run.py
 # The "$@" ensures any arguments you pass to `docker run` are sent to run.py
 ENTRYPOINT ["bash", "-c", "source /opt/conda/etc/profile.d/conda.sh && conda activate cytomine_py37 && exec python /app/run.py \"$@\"", "--"]
 
