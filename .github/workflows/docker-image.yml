@@ -42,4 +42,9 @@ jobs:
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
-
+    
+      name: Cleanup Docker to free space
+      if: always()
+      run: |
+        docker system prune -af
+        sudo rm -rf /tmp/*
